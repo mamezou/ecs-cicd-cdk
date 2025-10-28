@@ -1,30 +1,46 @@
-# from flask import Flask, escape, request, render_template
-import flask
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import datetime
 import platform
 import os
+import fastapi
 
-app = flask.Flask(__name__)
+app = FastAPI()
+
+# staticファイルとテンプレートの設定
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 
-@app.route('/')
-def hello():
-    name = flask.request.args.get("name", "Flask-demo")
+@app.get("/", response_class=HTMLResponse)
+async def hello(request: Request, name: str = "FastAPI-demo"):
     time = datetime.datetime.now()
     python_version = platform.python_version()
     aws_platform = os.environ.get('PLATFORM', 'Amazon Web Services')
-    return flask.render_template('hello.html',
-                                 platform=aws_platform,
-                                 flask_version=flask.__version__,
-                                 python_version=python_version,
-                                 flask_url='https://palletsprojects.com/p/flask/',
-                                 time=time,
-                                 name=name)
+    
+    return templates.TemplateResponse("hello.html", {
+        "request": request,
+        "platform": aws_platform,
+        "fastapi_version": fastapi.__version__,
+        "python_version": python_version,
+        "fastapi_url": "https://fastapi.tiangolo.com/",
+        "time": time,
+        "name": name
+    })
+
+
+@app.get("/health")
+async def health():
+    """ヘルスチェック用エンドポイント"""
+    return {"status": "healthy"}
 
 
 if __name__ == '__main__':
-    app.run(
-        debug=os.getenv('FLASK_DEBUG',False),
+    import uvicorn
+    uvicorn.run(
+        app,
         host='0.0.0.0',
-        port=5000
+        port=int(os.getenv('PORT', 8000))
     )

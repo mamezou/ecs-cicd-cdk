@@ -1,16 +1,18 @@
 FROM public.ecr.aws/amazonlinux/amazonlinux:2022
-RUN yum install python3 && \
-curl -O https://bootstrap.pypa.io/get-pip.py && \
-python3 get-pip.py && \
-pip install --upgrade pip && \
-pip install flask 
+RUN yum install -y python3 python3-pip && \
+    pip3 install --upgrade pip
 
 RUN alias python=python3
 
-ENV FLASK_APP app.py
 ENV PLATFORM 'Amazon ECS'
+ENV PORT 8000
 
 WORKDIR /app
+COPY requirements.txt /app/
+RUN pip3 install -r requirements.txt
+
 COPY . /app/
 
-CMD ["python3", "app.py"]
+EXPOSE 8000
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

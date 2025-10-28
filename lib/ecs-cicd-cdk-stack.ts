@@ -91,15 +91,19 @@ export class EcsCicdCdkStack extends cdk.Stack {
     taskDef.addToExecutionRolePolicy(executionRolePolicy);
 
     const baseImage = 'public.ecr.aws/amazonlinux/amazonlinux:2022'
-    const container = taskDef.addContainer('flask-app', {
+    const container = taskDef.addContainer('fastapi-app', {
       image: ecs.ContainerImage.fromRegistry(baseImage),
-      memoryLimitMiB: 256,
+      memoryLimitMiB: 512,
       cpu: 256,
-      logging
+      logging,
+      environment: {
+        PLATFORM: 'Amazon ECS with FastAPI',
+        PORT: '8000'
+      }
     });
 
     container.addPortMappings({
-      containerPort: 5000,
+      containerPort: 8000,
       protocol: ecs.Protocol.TCP
     });
 
@@ -108,7 +112,18 @@ export class EcsCicdCdkStack extends cdk.Stack {
       taskDefinition: taskDef,
       publicLoadBalancer: true,
       desiredCount: 1,
-      listenerPort: 80
+      listenerPort: 80,
+      healthCheckGracePeriod: cdk.Duration.seconds(60)
+    });
+
+    // ヘルスチェックの設定
+    fargateService.targetGroup.configureHealthCheck({
+      path: '/health',
+      healthyHttpCodes: '200',
+      interval: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(5),
+      healthyThresholdCount: 2,
+      unhealthyThresholdCount: 3
     });
 
 
@@ -179,7 +194,7 @@ export class EcsCicdCdkStack extends cdk.Stack {
             commands: [
               'echo "in post-build stage"',
               'cd ..',
-              "printf '[{\"name\":\"flask-app\",\"imageUri\":\"%s\"}]' $ecr_repo_uri:$tag > imagedefinitions.json",
+              "printf '[{\"name\":\"fastapi-app\",\"imageUri\":\"%s\"}]' $ecr_repo_uri:$tag > imagedefinitions.json",
               "pwd; ls -al; cat imagedefinitions.json"
             ]
           }
