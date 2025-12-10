@@ -90,7 +90,8 @@ export class EcsCicdCdkStack extends cdk.Stack {
 
     taskDef.addToExecutionRolePolicy(executionRolePolicy);
 
-    const baseImage = 'public.ecr.aws/amazonlinux/amazonlinux:2022'
+    // 初期デプロイ用のnginxイメージ（CI/CDパイプラインで実際のアプリイメージに置き換えられる）
+    const baseImage = 'nginx:alpine'
     const container = taskDef.addContainer('fastapi-app', {
       image: ecs.ContainerImage.fromRegistry(baseImage),
       memoryLimitMiB: 512,
@@ -103,7 +104,7 @@ export class EcsCicdCdkStack extends cdk.Stack {
     });
 
     container.addPortMappings({
-      containerPort: 8000,
+      containerPort: 80,
       protocol: ecs.Protocol.TCP
     });
 
@@ -113,12 +114,13 @@ export class EcsCicdCdkStack extends cdk.Stack {
       publicLoadBalancer: true,
       desiredCount: 1,
       listenerPort: 80,
-      healthCheckGracePeriod: cdk.Duration.seconds(60)
+      healthCheckGracePeriod: cdk.Duration.seconds(60),
+      assignPublicIp: true
     });
 
-    // ヘルスチェックの設定
+    // ヘルスチェックの設定（初期nginxイメージ用に/を使用、実際のアプリでは/healthに応答する）
     fargateService.targetGroup.configureHealthCheck({
-      path: '/health',
+      path: '/',
       healthyHttpCodes: '200',
       interval: cdk.Duration.seconds(30),
       timeout: cdk.Duration.seconds(5),

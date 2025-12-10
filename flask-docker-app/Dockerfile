@@ -1,15 +1,11 @@
-FROM public.ecr.aws/amazonlinux/amazonlinux:2022
-RUN yum install -y python3 python3-pip && \
-    pip3 install --upgrade pip
-
-RUN alias python=python3
+FROM python:3.11-slim
 
 ENV PLATFORM 'Amazon ECS'
 ENV PORT 8000
 
 WORKDIR /app
 COPY requirements.txt /app/
-RUN pip3 install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 
