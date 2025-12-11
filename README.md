@@ -118,7 +118,7 @@ EcsCicdCdkStack.loadbalancerdns = EcsCi-ecsse-xxxxx.ap-northeast-1.elb.amazonaws
 
 ```bash
 # アプリコードを編集
-cd flask-docker-app/templates
+cd docker-app/templates
 vi hello.html  # タイトルなどを変更
 
 # コミット＆プッシュ
@@ -203,13 +203,3 @@ aws cloudformation describe-stacks --stack-name EcsCicdCdkStack
 - GitHubのWebhook設定を確認（Settings → Webhooks）
 - CodeBuildの認証情報が登録されているか確認
 
-## 📚 参考リンク
-
-- [FastAPI公式ドキュメント](https://fastapi.tiangolo.com/)
-- [AWS ECS公式ドキュメント](https://docs.aws.amazon.com/ecs/)
-- [AWS CodePipeline公式ドキュメント](https://docs.aws.amazon.com/codepipeline/)
-- [AWS CDK公式ドキュメント](https://docs.aws.amazon.com/cdk/)
-
-## ライセンス
-
-このライブラリはMIT-0ライセンスの下でライセンスされています。詳細は[LICENSE](/LICENSE)ファイルを参照してください。

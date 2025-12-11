@@ -186,7 +186,7 @@ export class EcsCicdCdkStack extends cdk.Stack {
           },
           build: {
             commands: [
-              'cd flask-docker-app',
+              'cd docker-app',
               `docker build -t $ecr_repo_uri:$tag .`,
               '$(aws ecr get-login --no-include-email)',
               'docker push $ecr_repo_uri:$tag'
