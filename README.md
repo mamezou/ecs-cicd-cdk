@@ -153,7 +153,6 @@ FastAPI Application
 
 ## 📚 詳細ドキュメント
 
-- 📖 [詳細セットアップガイド](./SETUP.md)
 - 🔑 [GitHub設定](./docs/GITHUB_SETUP.md)
 - 🔐 [AWS SSO参考情報](./docs/AWS_SSO_SETUP.md)（任意）
 
