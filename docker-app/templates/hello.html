@@ -167,6 +167,60 @@
         .badge.fastapi { background: rgba(0, 150, 136, 0.2); color: #009688; }
         .badge.docker { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
 
+        /* Status Section */
+        .status-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .status-label {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-healthy { color: #00c853; }
+        .status-warning { color: #ff9900; }
+        .status-critical { color: #ff5252; }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-fill.cpu { background: linear-gradient(90deg, #00c853, #69f0ae); }
+        .progress-fill.memory { background: linear-gradient(90deg, #1a73e8, #64b5f6); }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -184,6 +238,7 @@
             .header h1 { font-size: 1.8rem; }
             .pipeline { flex-direction: column; }
             .pipeline-arrow { transform: rotate(90deg); }
+            .status-value { font-size: 1.5rem; }
         }
     </style>
 </head>
@@ -224,6 +279,38 @@
             </div>
         </div>
 
+        <div class="status-section">
+            <h2 class="pipeline-title">System Status (Live)</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-value status-healthy" id="status-indicator">●</div>
+                    <div class="status-label">Status</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value" id="uptime">--:--:--</div>
+                    <div class="status-label">Uptime</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value" id="latency">-- ms</div>
+                    <div class="status-label">Latency</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value" id="cpu-percent">--%</div>
+                    <div class="status-label">CPU</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill cpu" id="cpu-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-value" id="memory-percent">--%</div>
+                    <div class="status-label">Memory</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill memory" id="memory-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="info-grid">
             <div class="info-card">
                 <h3>📁 Repository</h3>
@@ -258,6 +345,37 @@
             <p>Container Name: <span class="time">{{ name }}</span></p>
         </div>
     </div>
+
+    <script>
+        // ステータス更新
+        async function updateStatus() {
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/status');
+                const latency = Math.round(performance.now() - startTime);
+                const data = await response.json();
+
+                document.getElementById('uptime').textContent = data.uptime;
+                document.getElementById('latency').textContent = latency + ' ms';
+                document.getElementById('cpu-percent').textContent = data.system.cpu_percent.toFixed(1) + '%';
+                document.getElementById('memory-percent').textContent = data.system.memory_percent.toFixed(1) + '%';
+                document.getElementById('cpu-bar').style.width = data.system.cpu_percent + '%';
+                document.getElementById('memory-bar').style.width = data.system.memory_percent + '%';
+
+                // ステータスインジケーター
+                const indicator = document.getElementById('status-indicator');
+                indicator.textContent = '●';
+                indicator.className = 'status-value status-healthy';
+            } catch (error) {
+                document.getElementById('status-indicator').textContent = '●';
+                document.getElementById('status-indicator').className = 'status-value status-critical';
+            }
+        }
+
+        // 初回実行と定期更新
+        updateStatus();
+        setInterval(updateStatus, 3000);
+    </script>
 </body>
 
 </html>
