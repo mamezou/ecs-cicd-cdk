@@ -89,10 +89,21 @@
             font-size: 1.8rem;
         }
 
-        .stage-github { background: linear-gradient(135deg, #333 0%, #24292e 100%); }
-        .stage-build { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); }
-        .stage-approve { background: linear-gradient(135deg, #ff9900 0%, #e68a00 100%); }
-        .stage-deploy { background: linear-gradient(135deg, #00c853 0%, #009624 100%); }
+        .stage-github {
+            background: linear-gradient(135deg, #333 0%, #24292e 100%);
+        }
+
+        .stage-build {
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+        }
+
+        .stage-approve {
+            background: linear-gradient(135deg, #ff9900 0%, #e68a00 100%);
+        }
+
+        .stage-deploy {
+            background: linear-gradient(135deg, #00c853 0%, #009624 100%);
+        }
 
         .stage-name {
             font-weight: 600;
@@ -163,9 +174,20 @@
             font-weight: 600;
         }
 
-        .badge.python { background: rgba(55, 118, 171, 0.2); color: #3776ab; }
-        .badge.fastapi { background: rgba(0, 150, 136, 0.2); color: #009688; }
-        .badge.docker { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+        .badge.python {
+            background: rgba(55, 118, 171, 0.2);
+            color: #3776ab;
+        }
+
+        .badge.fastapi {
+            background: rgba(0, 150, 136, 0.2);
+            color: #009688;
+        }
+
+        .badge.docker {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+        }
 
         /* Status Section */
         .status-section {
@@ -199,9 +221,17 @@
             letter-spacing: 1px;
         }
 
-        .status-healthy { color: #00c853; }
-        .status-warning { color: #ff9900; }
-        .status-critical { color: #ff5252; }
+        .status-healthy {
+            color: #00c853;
+        }
+
+        .status-warning {
+            color: #ff9900;
+        }
+
+        .status-critical {
+            color: #ff5252;
+        }
 
         .progress-bar {
             width: 100%;
@@ -218,8 +248,13 @@
             transition: width 0.3s ease;
         }
 
-        .progress-fill.cpu { background: linear-gradient(90deg, #00c853, #69f0ae); }
-        .progress-fill.memory { background: linear-gradient(90deg, #1a73e8, #64b5f6); }
+        .progress-fill.cpu {
+            background: linear-gradient(90deg, #00c853, #69f0ae);
+        }
+
+        .progress-fill.memory {
+            background: linear-gradient(90deg, #1a73e8, #64b5f6);
+        }
 
         /* Footer */
         .footer {
@@ -235,10 +270,21 @@
 
         /* Responsive */
         @media (max-width: 600px) {
-            .header h1 { font-size: 1.8rem; }
-            .pipeline { flex-direction: column; }
-            .pipeline-arrow { transform: rotate(90deg); }
-            .status-value { font-size: 1.5rem; }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .pipeline {
+                flex-direction: column;
+            }
+
+            .pipeline-arrow {
+                transform: rotate(90deg);
+            }
+
+            .status-value {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
@@ -248,6 +294,7 @@
         <div class="header">
             <h1><span class="emoji">🚀</span>ECS CI/CD Demo</h1>
             <p class="subtitle">FastAPI application running on Amazon ECS with automated CI/CD pipeline</p>
+            <p class="subtitle">Welcome to Advanced Architecting on AWS Traning!!</p>
         </div>
 
         <div class="pipeline-section">
@@ -348,7 +395,7 @@
 
     <script>
         // ステータス更新
-        async function updateStatus() {
+        async function updateStatus () {
             try {
                 const startTime = performance.now();
                 const response = await fetch('/status');
