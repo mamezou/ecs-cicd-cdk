@@ -1,204 +1,189 @@
 # ECS Fargate CI/CD ハンズオン
-_FastAPIアプリケーションで学ぶAWS CI/CDパイプライン_
 
-このハンズオンでは、AWS ECS Fargateにコンテナ化されたFastAPIアプリケーションをデプロイし、GitHubとAWS CodePipelineを連携させた継続的デリバリーパイプラインを構築します。
+受講者が自分のAWSアカウントに、ECS FargateへのCI/CDパイプラインをAWS CDKで作るハンズオンの手順書です。GitHubのmainブランチへpushするとCodePipelineが動き、アプリのイメージのビルドと受講者の承認を経てECS Fargateへデプロイします。リージョンは東京(ap-northeast-1)を使います。
 
-## 🎯 学習目標
+## 前提
 
-このハンズオンを通じて以下を学びます：
+- AWSアカウントと、マネジメントコンソールにサインインできるIAMユーザーかルートユーザー
+  - IAMユーザーには`AdministratorAccess`と`SignInLocalDevelopmentAccess`のポリシーを付ける。`SignInLocalDevelopmentAccess`は`aws login`に要る
+  - IAM Identity Center(AWS SSO)を使う人は、手順3の`aws sso login`で進める
+- GitHubアカウント
+- Node.js 18以上
+- AWS CLI 2.32.0以上(`aws --version`で確かめる。`aws login`は2.32.0から使える)
+- Git
 
-- ✅ **ECS Fargate**: サーバーレスコンテナ実行環境の構築
-- ✅ **AWS CodePipeline**: 継続的デリバリーパイプラインの実装
-- ✅ **AWS CodeBuild**: Dockerイメージの自動ビルド
-- ✅ **Infrastructure as Code**: AWS CDKによるインフラ管理
-- ✅ **GitOps**: GitHubプッシュによる自動デプロイ
+## 構成
 
-## � 前提条件
+![pushからECS Fargateへ反映されるまでの経路と担当サービス](docs/architecture.png)
 
-### 必須環境
+1. 受講者がGitHubのmainブランチへpushする
+2. GitHubのWebhookでCodePipelineが起動し、sourceステージがソースを取り出す
+3. buildステージでCodeBuildがDockerイメージをビルドし、ECRへpushする
+4. approveステージで受講者が承認する
+5. deploy-to-ecsステージがECSのタスクを新しいイメージで入れ替える。タスクはECRからイメージを取得する
+6. 受講者はインターネットゲートウェイとApplication Load Balancerを経由してアプリを開く
 
-- ✅ AWS SSOが設定済み・ログイン可能な状態
-- ✅ GitHubアカウント
-- ✅ Node.js 18以上がインストール済み
-- ✅ AWS CLI v2がインストール済み
-- ✅ Git
+図の元データは[docs/architecture.drawio](docs/architecture.drawio)。
 
-### インストール確認
+## 手順
 
-```bash
-# Node.js
-node --version  # v18以上
+### 1. フォークする
 
-# AWS CLI
-aws --version   # 2.x以上
+GitHubで[mamezou/ecs-cicd-cdk](https://github.com/mamezou/ecs-cicd-cdk)を開き、右上の[Fork]から自分のアカウントにフォークする。リポジトリの名前は`ecs-cicd-cdk`のままにする。自分のアカウントに`ecs-cicd-cdk`が表示されたら完了。
 
-# Git
-git --version
-```
+### 2. クローンする
 
-## �🚀 クイックスタート（30分）
-
-### 1. リポジトリのフォーク
-
-このリポジトリを自分のGitHubアカウントにフォーク:
-
-1. 右上の **Fork** ボタンをクリック
-2. フォーク先アカウントを選択
-
-### 2. ローカルにクローン
+フォークしたリポジトリをクローンする。`<your-github-username>`は自分のGitHubのユーザー名に置き換える。
 
 ```bash
-git clone https://github.com/<your-username>/ecs-cicd-cdk.git
+git clone https://github.com/<your-github-username>/ecs-cicd-cdk.git
 cd ecs-cicd-cdk
 ```
 
-### 3. AWS SSOでログイン
+以降のコマンドは、すべてこの`ecs-cicd-cdk`ディレクトリで実行する。
+
+### 3. AWSにログインする
+
+`aws login`でログインする。ブラウザが開くので、コンソールと同じIAMユーザーかルートユーザーでサインインする。リージョンを聞かれたら`ap-northeast-1`を入力する。
 
 ```bash
-# 既存のSSOプロファイルを使用
-aws sso login --profile <your-sso-profile>
-
-# プロファイルを環境変数に設定
-export AWS_PROFILE=<your-sso-profile>
+aws login --profile ecs-handson
 ```
 
-### 4. GitHubトークンの作成と保存
+AWS SSOを使う人は、`aws login`の代わりに`aws sso login --profile <your-sso-profile>`でログインし、次のコマンドの`--profile ecs-handson`を`--profile <your-sso-profile>`に置き換える。SSOのプロファイルの作り方は[AWS SSOの設定手順](docs/AWS_SSO_SETUP.md)にある。
 
-詳細は [docs/GITHUB_SETUP.md](./docs/GITHUB_SETUP.md) を参照。
+このリポジトリのCDK CLI(2.110.1)は、`aws login`の認証情報を直接読めない。AWS CLIから認証情報を受け取るプロファイル`ecs-handson-cdk`を作り、以降はこのプロファイルを使う。
 
 ```bash
-# 1. GitHubでパーソナルアクセストークンを作成
-#    Settings → Developer settings → Personal access tokens
-#    必要なスコープ: repo, admin:repo_hook
+aws configure set credential_process "aws configure export-credentials --profile ecs-handson --format process" --profile ecs-handson-cdk
+aws configure set region ap-northeast-1 --profile ecs-handson-cdk
+export AWS_PROFILE=ecs-handson-cdk
+export AWS_REGION=ap-northeast-1
+aws sts get-caller-identity
+```
 
-# 2. Secrets Managerに保存
+`aws sts get-caller-identity`の結果に自分のアカウントIDが出たら完了。ターミナルを開き直したときは、2つの`export`をもう一度実行する。
+
+### 4. GitHubトークンを作ってSecrets Managerに保存する
+
+GitHubの[Settings] → [Developer settings] → [Personal access tokens] → [Tokens (classic)] → [Generate new token (classic)]で、スコープ`repo`と`admin:repo_hook`を付けたトークンを作る。トークンは作成した画面でしか表示されないので、その場でコピーする。画面ごとの操作は[GitHubの設定手順](docs/GITHUB_SETUP.md)にある。
+
+作ったトークンをSecrets Managerに保存する。`<YOUR-GITHUB-TOKEN>`は作ったトークンに置き換える。
+
+```bash
 aws secretsmanager create-secret \
   --name /ecs-cicd-cdk/github/personal_access_token \
   --secret-string "<YOUR-GITHUB-TOKEN>"
-
-# 3. CodeBuildに認証情報を登録
-aws codebuild import-source-credentials \
-  --server-type GITHUB \
-  --auth-type PERSONAL_ACCESS_TOKEN \
-  --token <YOUR-GITHUB-TOKEN>
 ```
 
-### 5. CDKデプロイ
+次のコマンドでシークレットの名前が出たら完了。
 
 ```bash
-# 依存関係のインストール
-npm install
-
-# TypeScriptビルド
-npm run build
-
-# CDK Bootstrap（初回のみ）
-cdk bootstrap
-
-# デプロイ
-cdk deploy --parameters githubUserName=<your-github-username>
+aws secretsmanager describe-secret --secret-id /ecs-cicd-cdk/github/personal_access_token --query Name
 ```
 
-デプロイには約10〜15分かかります。
+### 5. CDKでデプロイする
 
-### 6. アプリケーションにアクセス
+`<your-github-username>`は手順2と同じく自分のGitHubのユーザー名に置き換える。
 
-デプロイ完了後、出力されるロードバランサーのURLにアクセス:
+```bash
+npm install
+npm run build
+npx cdk bootstrap   # このアカウントとリージョンで初めてCDKを使うときだけ
+npx cdk deploy \
+  --parameters githubUserName=<your-github-username> \
+  --parameters githubRespository=ecs-cicd-cdk \
+  --parameters githubPersonalTokenSecretName=/ecs-cicd-cdk/github/personal_access_token
+```
+
+- 3つのパラメータは省かない。省くとスタックの既定値が使われ、フォークしたリポジトリや手順4のシークレットと合わなくなる。
+- `githubRespository`にはフォークしたリポジトリの名前を渡す。パラメータ名はスタックで定義した綴りなので、`githubRepository`に直さない。
+- デプロイの途中で、作られるIAMロールとセキュリティグループの一覧が出て、`Do you wish to deploy these changes (y/n)?`と聞かれる。`y`を入力する。
+- デプロイは5分ほどかかる。
+
+### 6. アプリを開いて承認する
+
+デプロイが終わると、次のような出力が出る。
 
 ```
 Outputs:
-EcsCicdCdkStack.loadbalancerdns = EcsCi-ecsse-xxxxx.ap-northeast-1.elb.amazonaws.com
+EcsCicdCdkStack.loadbalancerdns = EcsCic-ecsse-xxxxxxxxxxxx-xxxxxxxxx.ap-northeast-1.elb.amazonaws.com
 ```
 
-ブラウザで `http://<loadbalancer-dns>` を開いて動作確認。
+ブラウザで`http://<loadbalancerdnsの値>`を開くと、初期デプロイ用のnginxの画面が出る。
 
-## 🔄 CI/CDパイプラインのテスト
+パイプラインは作成と同時に1回動き、デプロイが終わってから3分ほどでapproveステージの承認待ちになる。東京リージョンのCodePipelineのコンソールでパイプラインを開き、approveステージの[レビュー]から承認する。承認から4分ほどでdeploy-to-ecsステージが終わり、ブラウザの画面がFastAPIのアプリに置き換わる。
 
-### コードを変更してプッシュ
+## CI/CDを試す
+
+1. `docker-app/templates/hello.html`の`<h1>`にある`ECS CI/CD Demo`を、自分の名前などに書き換え、mainにpushする。
+
+   ```bash
+   git add docker-app/templates/hello.html
+   git commit -m "Update app title"
+   git push origin main
+   ```
+
+2. CodePipelineのコンソールで進み具合を見る。CodePipelineはsource → build → approve → deploy-to-ecsの順にステージを実行する。
+3. approveステージを、手順6と同じ操作で承認する。
+4. deploy-to-ecsステージが終わったら、ブラウザでアプリを開き、見出しが書き換わっていることを確かめる。
+
+## 削除
+
+起動している間はApplication Load BalancerとFargateの料金がかかるので、ハンズオンが終わったら削除する。
+
+ECRのリポジトリ、CodePipelineの成果物を置くS3バケット、コンテナのログを置くCloudWatch Logsのロググループは、`npx cdk destroy`では削除されずに残る。スタックを削除する前に、3つの名前を控えておく。
 
 ```bash
-# アプリコードを編集
-cd docker-app/templates
-vi hello.html  # タイトルなどを変更
-
-# コミット＆プッシュ
-git add .
-git commit -m "Update app title"
-git push origin main
+ECR_REPO=$(aws cloudformation describe-stack-resources --stack-name EcsCicdCdkStack \
+  --query "StackResources[?ResourceType=='AWS::ECR::Repository'].PhysicalResourceId" --output text)
+BUCKET=$(aws cloudformation describe-stack-resources --stack-name EcsCicdCdkStack \
+  --query "StackResources[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" --output text)
+LOG_GROUP=$(aws cloudformation describe-stack-resources --stack-name EcsCicdCdkStack \
+  --query "StackResources[?ResourceType=='AWS::Logs::LogGroup'].PhysicalResourceId" --output text)
+echo "$ECR_REPO $BUCKET $LOG_GROUP"
 ```
 
-### パイプラインの確認
-
-1. **AWS Console** → **CodePipeline** で進行状況を確認
-2. **Approve**ステージで手動承認
-3. デプロイ完了後、ブラウザで変更を確認
-
-## 🏗️ アーキテクチャ
-
-```
-GitHub (Push)
-    ↓
-CodePipeline (Source)
-    ↓
-CodeBuild (Build & Push to ECR)
-    ↓
-Manual Approval
-    ↓
-ECS Fargate (Deploy)
-    ↓
-Application Load Balancer
-    ↓
-FastAPI Application
-```
-
-## 📚 詳細ドキュメント
-
-- 🔑 [GitHub設定](./docs/GITHUB_SETUP.md)
-- 🔐 [AWS SSO参考情報](./docs/AWS_SSO_SETUP.md)（任意）
-
-## 🧹 クリーンアップ
-
-ハンズオン終了後、リソースを削除してコストを回避:
+スタックを削除する。確認を求められたら`y`を入力する。削除は10分ほどかかる。
 
 ```bash
-cdk destroy
+npx cdk destroy
 ```
 
-確認プロンプトで `y` を入力。
-
-## 💰 コスト概算
-
-このハンズオンを1日実行した場合の概算コスト（東京リージョン）:
-
-- Fargate: 約$1.2/日
-- ALB: 約$0.7/日
-- その他（ECR、CodePipeline等）: 約$0.1/日
-
-**1日あたり合計**: 約$2
-
-ハンズオン終了後は必ず`cdk destroy`でリソースを削除してください。
-
-## ❓ トラブルシューティング
-
-### デプロイが失敗する
+残った3つを削除する。S3バケットは中のファイルごと削除する。
 
 ```bash
-# エラー内容を確認
-cdk deploy --verbose
-
-# スタック状態を確認
-aws cloudformation describe-stacks --stack-name EcsCicdCdkStack
+aws ecr delete-repository --repository-name "$ECR_REPO" --force
+aws s3 rb "s3://$BUCKET" --force
+aws logs delete-log-group --log-group-name "$LOG_GROUP"
 ```
 
-### ECSタスクが起動しない
+手順4で保存したシークレットを削除する。
 
 ```bash
-# ECSコンソールでタスクの詳細を確認
-# CloudWatch Logsでログを確認
+aws secretsmanager delete-secret \
+  --secret-id /ecs-cicd-cdk/github/personal_access_token \
+  --force-delete-without-recovery
 ```
 
-### パイプラインがトリガーされない
+最後に、GitHubの[Settings] → [Developer settings] → [Personal access tokens] → [Tokens (classic)]で、手順4で作ったトークンを削除する。
 
-- GitHubのWebhook設定を確認（Settings → Webhooks）
-- CodeBuildの認証情報が登録されているか確認
+## うまくいかないとき
 
+- `npx cdk deploy`が失敗したときは、エラーの内容を見る。スタックの状態は次のコマンドで見る。`ROLLBACK_COMPLETE`のときは`npx cdk destroy`で削除してから、原因を直してデプロイし直す。
+
+  ```bash
+  aws cloudformation describe-stacks --stack-name EcsCicdCdkStack --query "Stacks[0].StackStatus"
+  ```
+
+- パイプラインのsourceステージが失敗したときは、手順5の`githubUserName`と`githubRespository`の値と、手順4のトークンのスコープを確かめる。
+- パイプラインのbuildステージが失敗したときは、CodeBuildのコンソールでプロジェクト`EcsCicdCdkStack`のビルド履歴を開き、ログを見る。
+- ECSのタスクが起動しないときは、ECSのコンソールでタスクの詳細を開いて停止した理由を見て、CloudWatch Logsでコンテナのログを見る。
+- pushしてもパイプラインが動かないときは、フォークしたリポジトリの[Settings] → [Webhooks]を開き、URLが`https://ap-northeast-1.webhooks.aws/`で始まるWebhookがあるかを見る。このWebhookがCodePipelineを動かす。なければ、手順4のトークンのスコープに`admin:repo_hook`があるかを確かめる。
+
+## 詳しい資料
+
+| 資料 | 内容 |
+|---|---|
+| [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md) | GitHubトークンの作成から削除まで |
+| [docs/AWS_SSO_SETUP.md](docs/AWS_SSO_SETUP.md) | AWS SSOのプロファイルの作り方 |

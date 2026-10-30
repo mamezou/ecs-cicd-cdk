@@ -6,7 +6,6 @@
 
 1. GitHubパーソナルアクセストークンの作成
 2. AWS Secrets Managerへのトークン保存
-3. CodeBuildへの認証情報登録
 
 ## 🔑 1. GitHubパーソナルアクセストークンの作成
 
@@ -81,8 +80,9 @@ aws secretsmanager create-secret \
 異なるシークレット名を使用する場合、CDKデプロイ時にパラメータで指定：
 
 ```bash
-cdk deploy \
+npx cdk deploy \
   --parameters githubUserName=<your-github-username> \
+  --parameters githubRespository=ecs-cicd-cdk \
   --parameters githubPersonalTokenSecretName="/your/custom/secret/name"
 ```
 
@@ -96,39 +96,7 @@ aws secretsmanager get-secret-value \
   --output text
 ```
 
-## 🔨 3. CodeBuildへの認証情報登録
-
-CodeBuildがGitHubにWebhookを作成できるよう認証情報を登録：
-
-```bash
-aws codebuild import-source-credentials \
-  --server-type GITHUB \
-  --auth-type PERSONAL_ACCESS_TOKEN \
-  --token <GITHUB-TOKEN> \
-  --region $AWS_REGION
-```
-
-### 登録確認
-
-```bash
-aws codebuild list-source-credentials --region $AWS_REGION
-```
-
-以下のような出力が表示されればOK：
-
-```json
-{
-    "sourceCredentialsInfos": [
-        {
-            "arn": "arn:aws:codebuild:ap-northeast-1:123456789012:token/github",
-            "serverType": "GITHUB",
-            "authType": "PERSONAL_ACCESS_TOKEN"
-        }
-    ]
-}
-```
-
-## 📝 4. リポジトリのフォークまたはクローン
+## 📝 3. リポジトリのフォークまたはクローン
 
 ### 新規リポジトリとして使用する場合
 
@@ -148,18 +116,10 @@ cd ecs-cicd-cdk
 
 ## 🔄 CDKデプロイ時のパラメータ
 
-GitHubユーザー名を指定してデプロイ：
+3つのパラメータをすべて指定してデプロイする。省くとスタックの既定値が使われ、フォークしたリポジトリやシークレットと合わなくなる。
 
 ```bash
-cdk deploy \
-  --profile my-profile \
-  --parameters githubUserName=<your-github-username>
-```
-
-### 全パラメータを指定する場合
-
-```bash
-cdk deploy \
+npx cdk deploy \
   --profile my-profile \
   --parameters githubUserName=<your-github-username> \
   --parameters githubRespository=ecs-cicd-cdk \
@@ -184,21 +144,6 @@ aws secretsmanager delete-secret \
   --region $AWS_REGION
 ```
 
-### CodeBuildの認証情報を削除
-
-```bash
-# ARNを取得
-SOURCE_CRED_ARN=$(aws codebuild list-source-credentials \
-  --query 'sourceCredentialsInfos[?serverType==`GITHUB`].arn' \
-  --output text \
-  --region $AWS_REGION)
-
-# 削除
-aws codebuild delete-source-credentials \
-  --arn $SOURCE_CRED_ARN \
-  --region $AWS_REGION
-```
-
 ## ❓ トラブルシューティング
 
 ### エラー: "Repository not found"
@@ -213,7 +158,6 @@ aws codebuild delete-source-credentials \
 
 ### Webhookが作成されない
 
-- CodeBuildに認証情報が登録されているか確認
 - GitHubトークンの `admin:repo_hook` 権限があるか確認
 
 ## 🔒 セキュリティのベストプラクティス
@@ -230,4 +174,3 @@ aws codebuild delete-source-credentials \
 
 - [GitHub Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
 - [AWS Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html)
-- [AWS CodeBuild Source Credentials](https://docs.aws.amazon.com/codebuild/latest/userguide/sample-access-tokens.html)
