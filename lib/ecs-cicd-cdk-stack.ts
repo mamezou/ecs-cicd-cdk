@@ -33,9 +33,7 @@ export class EcsCicdCdkStack extends cdk.Stack {
 
     const ecrRepo = new ecr.Repository(this, 'ecrRepo');
 
-    /**
-     * create a new vpc with single nat gateway
-     */
+    // パブリックサブネットだけのVPC。タスクはパブリックIPで外へ出るため、NATゲートウェイは作らない
     const vpc = new ec2.Vpc(this, 'ecs-cdk-vpc', {
       subnetConfiguration: [
         {
@@ -45,7 +43,7 @@ export class EcsCicdCdkStack extends cdk.Stack {
         },
         // Add more subnet configurations as needed for private and isolated subnets
       ],
-      natGateways: 1,
+      natGateways: 0,
       maxAzs: 3 /* does a sample need 3 az's? */
     });
 
@@ -142,19 +140,9 @@ export class EcsCicdCdkStack extends cdk.Stack {
 
 
 
-    const gitHubSource = codebuild.Source.gitHub({
-      owner: githubUserName.valueAsString,
-      repo: githubRepository.valueAsString,
-      webhook: true, // optional, default: true if `webhookfilteres` were provided, false otherwise
-      webhookFilters: [
-        codebuild.FilterGroup.inEventOf(codebuild.EventAction.PUSH).andBranchIs('main'),
-      ], // optional, by default all pushes and pull requests will trigger a build
-    });
-
-    // codebuild - project
-    const project = new codebuild.Project(this, 'myProject', {
+    // パイプラインからだけ動くビルド。GitHubを直接見ないので、承認前にECRのイメージが上書きされない
+    const project = new codebuild.PipelineProject(this, 'myProject', {
       projectName: `${this.stackName}`,
-      source: gitHubSource,
       environment: {
         buildImage: codebuild.LinuxBuildImage.AMAZON_LINUX_2_2,
         privileged: true
@@ -167,7 +155,6 @@ export class EcsCicdCdkStack extends cdk.Stack {
           value: `${ecrRepo.repositoryUri}`
         }
       },
-      badge: true,
       // TODO - I had to hardcode tag here
       buildSpec: codebuild.BuildSpec.fromObject({
         version: "0.2",
