@@ -1,3 +1,5 @@
+> **このリポジトリは 2026-11-18 に [training-demos の aws/advanced-architecting-on-aws/ecs-cicd-cdk](https://github.com/mamezou/training-demos/tree/main/aws/advanced-architecting-on-aws/ecs-cicd-cdk) へ移しました。** これからの更新は移動先で行います。このリポジトリはアーカイブして、更新しません。
+
 # ECS Fargate CI/CD ハンズオン
 
 受講者が自分のAWSアカウントに、ECS FargateへのCI/CDパイプラインをAWS CDKで作るハンズオンの手順書です。GitHubのmainブランチへpushするとCodePipelineが動き、アプリのイメージのビルドと受講者の承認を経てECS Fargateへデプロイします。リージョンは東京(ap-northeast-1)を使います。
